@@ -1,0 +1,8 @@
+name = Dennis Cache Warmer
+description = A Drush command that hits a set of URIs of a drupal site.
+
+core = 7.x
+package = Performance and Scalability
+
+files[] = dennis_cache_warmer.module
+files[] = dennis_cache_warmer.drush.inc

@@ -1,0 +1,86 @@
+<?php
+
+/**
+ * @file
+ * dennis_cache_warmer
+ */
+
+/**
+ * Visit each of the given paths.
+ */
+function dennis_cache_warmer_visit($base_uri, $paths, $credentials, $timeout = 30) {
+
+  // Initialize cURL.
+  $ch = curl_init();
+
+  // Use any credentials we were given for logging in.
+  if (!empty($credentials)) {
+    $login_url = $base_uri . "/user/login";
+
+    $cookie_file = '/tmp/dennis_cache_warmer_cookie_' . md5($base_uri) . '.txt';
+
+    // Set cURL options for logging in.
+    curl_setopt($ch, CURLOPT_URL, $login_url);
+    curl_setopt($ch, CURLOPT_HEADER, TRUE);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie_file);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'Dennis Cache Warmer Drupal module');
+
+    // Set the POST data.
+    $postdata = array(
+      "name" => $credentials['username'],
+      "pass" => $credentials['password'],
+      "form_id" => "user_login",
+      "op" => "Log in",
+    );
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postdata);
+
+    // Fire off the request and check if it worked.
+    $result = curl_exec($ch);
+    $headers = curl_getinfo($ch);
+    if ($headers['url'] == $login_url) {
+      watchdog(
+        'dennis_cache_warmer',
+        t('Login failed! Warming caches unauthenticated...'),
+        array(),
+        WATCHDOG_ERROR
+      );
+    }
+  }
+
+  // Initialize the list of requests.
+  $requests = array();
+
+  // cURL request basic options.
+  curl_setopt_array($ch, array(
+    CURLOPT_NOBODY => TRUE, // HEAD request.
+    CURLOPT_TIMEOUT => $timeout,
+  ));
+
+  // Start the timer.
+  $timer_start = time();
+
+  // Main loop. We store the total request time and status.
+  foreach ($paths as $path) {
+    curl_setopt($ch, CURLOPT_URL, $base_uri . $path);
+    curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $time = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+    $requests[] = $path . ' (' . $status . ') ' . $time;
+  }
+
+  // Record the total time.
+  watchdog(
+    'dennis_cache_warmer',
+    t('Total cache-warming time was @time seconds.'),
+    array('@time' => time() - $timer_start)
+  );
+
+  // Release the cURL handler.
+  curl_close($ch);
+
+  return $requests;
+}
