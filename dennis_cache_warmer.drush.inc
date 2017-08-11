@@ -13,18 +13,21 @@ function dennis_cache_warmer_drush_command() {
   // The command options.
   $options = array(
     'paths' => 'Path to a file containing the paths to warm.',
-    'autouser' => 'Generate a tempory user to visit pages.',
+    'autouser' => 'Generate a temporary user to visit pages.',
     'username' => 'The username with which to log into Drupal. Anonymous access is the default.',
     'password' => 'The password associated with the specified username. See "--username".',
   );
   // The provided commands.
-  $items['dennis-warmer'] = array(
+  $items['dennis-cache-warm'] = array(
     'callback' => 'dennis_cache_warmer_run',
-    'description' => 'Keeps an external cache primed by issuing HTTP requests according to several criteria.',
+    'description' => 'Warms the cache.',
     'bootstrap' => DRUSH_BOOTSTRAP_NONE,
     'arguments' => array('site' => 'Site base URI.'),
     'examples' => array(
-      'drush dennis-warmer http://auth.example.com' => 'Visits pages.',
+      'drush dennis-cache-warm --autouser http://auth.example.com'
+        => 'Visits pages on the auth site.',
+      'drush dennis-cache-warm --username=admin --password=password http://auth.example.com'
+        => 'Visit pages with an existing admin account',
     ),
     'options' => $options,
     'aliases' => array('dcw'),
@@ -45,6 +48,7 @@ function dennis_cache_warmer_run($base_uri = '') {
   if (empty($base_uri)) {
     return drush_set_error('DENNIS_CACHE_WARMER_ERROR', 'A base url for the site is required.');
   }
+  rtrim($base_uri, '/');
 
   // Read paths from an external file.
   $file = drush_get_option('paths');
@@ -56,7 +60,7 @@ function dennis_cache_warmer_run($base_uri = '') {
     $paths = array_map('trim', $paths);
   }
   else {
-    $paths = array('/');
+    $paths = array('/', '/news', '/reviews', '/contact-us');
   }
 
   $credentials = array();
