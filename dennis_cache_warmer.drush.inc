@@ -94,9 +94,16 @@ function dennis_cache_warmer_run($base_uri = '') {
     }
   }
 
-  $results = dennis_cache_warmer_visit($base_uri, $paths, $credentials);
-  foreach ($results as $result) {
-    drush_print($result);
+  try {
+    $results = dennis_cache_warmer_visit($base_uri, $paths, $credentials);
+    if (empty($results)) {
+      return drush_set_error('DENNIS_CACHE_WARMER_ERROR', 'ERROR: No urls visited.');
+    }
+    foreach ($results as $result) {
+      drush_print($result);
+    }
+  } catch (Exception $e) {
+    return drush_set_error('DENNIS_CACHE_WARMER_ERROR', 'ERROR: ' . $e->getMessage());
   }
 
   // Remove the auto created user.

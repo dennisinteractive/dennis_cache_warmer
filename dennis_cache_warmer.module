@@ -28,6 +28,7 @@ function dennis_cache_warmer_visit($base_uri, $paths, $credentials, $timeout = 3
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Dennis Cache Warmer Drupal module');
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
 
     // Set the POST data.
     $postdata = array(
@@ -39,15 +40,26 @@ function dennis_cache_warmer_visit($base_uri, $paths, $credentials, $timeout = 3
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postdata);
 
     // Fire off the request and check if it worked.
-    $result = curl_exec($ch);
-    $headers = curl_getinfo($ch);
-    if ($headers['url'] == $login_url) {
-      watchdog(
-        'dennis_cache_warmer',
-        t('Login failed! Warming caches unauthenticated...'),
-        array(),
-        WATCHDOG_ERROR
-      );
+    if ($result = curl_exec($ch)) {
+      $headers = curl_getinfo($ch);
+      if ($headers['url'] == $login_url) {
+        $error = t('Login failed! Warming caches unauthenticated...');
+        watchdog(
+          'dennis_cache_warmer',
+          $error,
+          array(),
+          WATCHDOG_ERROR
+        );
+        curl_close($ch);
+        throw new Exception($error);
+      }
+
+    }
+    else {
+      $errno = curl_errno($ch);
+      $error = curl_error($ch);
+      curl_close($ch);
+      throw new Exception($error, $errno);
     }
   }
 
@@ -57,7 +69,6 @@ function dennis_cache_warmer_visit($base_uri, $paths, $credentials, $timeout = 3
   // cURL request basic options.
   curl_setopt_array($ch, array(
     CURLOPT_NOBODY => TRUE, // HEAD request.
-    CURLOPT_TIMEOUT => $timeout,
   ));
 
   // Start the timer.
@@ -66,10 +77,11 @@ function dennis_cache_warmer_visit($base_uri, $paths, $credentials, $timeout = 3
   // Main loop. We store the total request time and status.
   foreach ($paths as $path) {
     curl_setopt($ch, CURLOPT_URL, $base_uri . $path);
-    curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $time = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
-    $requests[] = $path . ' (' . $status . ') ' . $time;
+    if (curl_exec($ch)) {
+      $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+      $time = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
+      $requests[] = $path . ' (' . $status . ') ' . $time;
+    }
   }
 
   // Record the total time.
