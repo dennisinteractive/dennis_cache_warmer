@@ -12,6 +12,7 @@ function dennis_cache_warmer_drush_command() {
   $items = array();
   // The command options.
   $options = array(
+    'mode' => 'Cache warmer will be operating in maintenance mode by default. "--mode=Off" allows use when not in maintenance mode.',
     'paths' => 'Path to a file containing the paths to warm.',
     'autouser' => 'Generate a temporary user to visit pages.',
     'username' => 'The username with which to log into Drupal. Anonymous access is the default.',
@@ -28,6 +29,8 @@ function dennis_cache_warmer_drush_command() {
         => 'Visits pages on the auth site.',
       'drush dennis-cache-warm --username=admin --password=password http://auth.example.com'
         => 'Visit pages with an existing admin account',
+      'drush dennis-cache-warm --mode=off http://auth.example.com'
+        => 'Visit pages with maintenance mode off. Login details not required',
     ),
     'options' => $options,
     'aliases' => array('dcw'),
@@ -49,6 +52,13 @@ function dennis_cache_warmer_run($base_uri = '') {
     return drush_set_error('DENNIS_CACHE_WARMER_ERROR', 'A base url for the site is required.');
   }
   rtrim($base_uri, '/');
+
+  // Find out mode to be run in.
+  $mode = drush_get_option('mode');
+  // Set default mode to be on
+  if (empty($mode)) {
+    $mode = 'On';
+  }
 
   // Read paths from an external file.
   $file = drush_get_option('paths');
@@ -92,6 +102,10 @@ function dennis_cache_warmer_run($base_uri = '') {
     if (!empty($username) && !empty($password)) {
       $credentials = array('username' => $username, 'password' => $password);
     }
+  }
+
+  if ($mode == 'On' && empty($credentials)) {
+    return drush_set_error('DENNIS_CACHE_WARMER_ERROR', 'A user is required when the site is in maintenance mode.');
   }
 
   try {
